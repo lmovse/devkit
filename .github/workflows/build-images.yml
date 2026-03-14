@@ -31,10 +31,10 @@ jobs:
       - name: Detect changed images
         id: detect
         run: |
-          # 获取当前提交的 version.json
           CURRENT_VERSION_FILE="images/version.json"
 
           if [ ! -f "$CURRENT_VERSION_FILE" ]; then
+            echo "changed_images=[]" >> $GITHUB_OUTPUT
             echo "No version.json found"
             exit 0
           fi
@@ -42,23 +42,23 @@ jobs:
           # 获取上一提交的 version.json
           PREV_COMMIT=$(git rev-parse HEAD^)
           if git show $PREV_COMMIT:$CURRENT_VERSION_FILE > /tmp/prev_version.json 2>/dev/null; then
-            # 比较版本差异
+            # 比较版本差异，输出 JSON 数组
             CHANGED_IMAGES=$(jq -r '
-              to_entries[] |
+              [to_entries[] |
               select(.key as $key | (input_filename | fromjson)[$key] != .value) |
-              .key
+              .key]
             ' <(git show $PREV_COMMIT:$CURRENT_VERSION_FILE) <(cat $CURRENT_VERSION_FILE))
 
-            if [ -n "$CHANGED_IMAGES" ]; then
+            if [ "$CHANGED_IMAGES" != "[]" ] && [ -n "$CHANGED_IMAGES" ]; then
               echo "changed_images=$CHANGED_IMAGES" >> $GITHUB_OUTPUT
               echo "Changed images: $CHANGED_IMAGES"
             else
-              echo "changed_images=" >> $GITHUB_OUTPUT
+              echo "changed_images=[]" >> $GITHUB_OUTPUT
               echo "No version changes detected"
             fi
           else
             # 首次提交，获取所有镜像
-            CHANGED_IMAGES=$(jq -r 'keys[]' $CURRENT_VERSION_FILE)
+            CHANGED_IMAGES=$(jq -r 'keys' $CURRENT_VERSION_FILE)
             echo "changed_images=$CHANGED_IMAGES" >> $GITHUB_OUTPUT
             echo "First commit, building all images: $CHANGED_IMAGES"
           fi
