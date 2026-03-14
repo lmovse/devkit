@@ -7,109 +7,83 @@ on:
     paths:
       - 'images/**'
   pull_request:
+    branches:
+      - main
     paths:
       - 'images/**'
 
-env:
-  # GitHub 容器仓库地址
-  GITHUB_REGISTRY: ghcr.io
-  # GitHub 用户名或组织名
-  GITHUB_OWNER: ${{ github.repository_owner }}
-
 jobs:
-  # 检测 version.json 变更
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      changed_images: ${{ steps.detect.outputs.changed_images }}
+      matrix: ${{ steps.diff.outputs.matrix }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
-      - name: Detect changed images
-        id: detect
+      - name: Diff version.json
+        id: diff
         run: |
-          CURRENT_VERSION_FILE="images/version.json"
+          VERSION_FILE="images/version.json"
 
-          if [ ! -f "$CURRENT_VERSION_FILE" ]; then
-            echo "changed_images=[]" >> $GITHUB_OUTPUT
-            echo "No version.json found"
+          # version.json 不存在则跳过
+          if [ ! -f "$VERSION_FILE" ]; then
+            echo "matrix=[]" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # 获取上一提交的 version.json
-          PREV_COMMIT=$(git rev-parse HEAD^)
-          if git show $PREV_COMMIT:$CURRENT_VERSION_FILE > /tmp/prev_version.json 2>/dev/null; then
-            # 比较版本差异，输出 JSON 数组
-            CHANGED_IMAGES=$(jq -r '
-              [to_entries[] |
-              select(.key as $key | (input_filename | fromjson)[$key] != .value) |
-              .key]
-            ' <(git show $PREV_COMMIT:$CURRENT_VERSION_FILE) <(cat $CURRENT_VERSION_FILE))
+          CURR=$(cat "$VERSION_FILE")
 
-            if [ "$CHANGED_IMAGES" != "[]" ] && [ -n "$CHANGED_IMAGES" ]; then
-              echo "changed_images=$CHANGED_IMAGES" >> $GITHUB_OUTPUT
-              echo "Changed images: $CHANGED_IMAGES"
-            else
-              echo "changed_images=[]" >> $GITHUB_OUTPUT
-              echo "No version changes detected"
-            fi
-          else
-            # 首次提交，获取所有镜像
-            CHANGED_IMAGES=$(jq -r 'keys' $CURRENT_VERSION_FILE)
-            echo "changed_images=$CHANGED_IMAGES" >> $GITHUB_OUTPUT
-            echo "First commit, building all images: $CHANGED_IMAGES"
-          fi
+          # 尝试获取上一次的 version.json
+          PREV=$(git show HEAD^:"$VERSION_FILE" 2>/dev/null || echo "{}")
 
-  # 构建并推送镜像
-  build-and-push:
+          # 找出版本号有变化的镜像
+          MATRIX=$(jq -cn \
+            --argjson prev "$PREV" \
+            --argjson curr "$CURR" \
+            '[
+              $curr | to_entries[] |
+              select(.value != $prev[.key]) |
+              { image: .key, version: .value }
+            ]')
+
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Changed: $MATRIX"
+
+  build:
     needs: detect-changes
-    if: needs.detect-changes.outputs.changed_images != ''
+    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        image: ${{ fromJson(needs.detect-changes.outputs.changed_images) }}
+        include: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get image version
-        id: version
-        run: |
-          VERSION=$(jq -r '.${{ matrix.image }}' images/version.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building image: ${{ matrix.image }} version: $VERSION"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v4
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Login to GitHub Container Registry
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.GITHUB_REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multi-platform image
-        uses: docker/build-push-action@v5
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
-          context: ./images/${{ matrix.image }}
-          file: ./images/${{ matrix.image }}/Dockerfile
+          context: images/${{ matrix.image }}
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ github.event_name == 'push' }}
           tags: |
-            ${{ env.GITHUB_REGISTRY }}/${{ env.GITHUB_OWNER }}/${{ matrix.image }}:${{ steps.version.outputs.version }}
-            ${{ env.GITHUB_REGISTRY }}/${{ env.GITHUB_OWNER }}/${{ matrix.image }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Verify image pushed
-        run: |
-          echo "Image pushed successfully:"
-          echo "  ${{ env.GITHUB_REGISTRY }}/${{ env.GITHUB_OWNER }}/${{ matrix.image }}:${{ steps.version.outputs.version }}"
-          echo "  ${{ env.GITHUB_REGISTRY }}/${{ env.GITHUB_OWNER }}/${{ matrix.image }}:latest"
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ matrix.version }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max

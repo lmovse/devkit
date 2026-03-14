@@ -1,11 +1,5 @@
 FROM node:24
 
-ENV TZ="Asia/Shanghai"
-
-# Set up npm and apt mirror to China
-RUN npm config set registry https://registry.npmmirror.com && \
-    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/*.sources
-
 # Install basic development tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
@@ -27,22 +21,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install OpenJDK 21 from Adoptium
 ARG JDK_VERSION=21.0.10
 RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "arm64" ]; then \
-        JDK_ARCH=aarch64; \
-    else \
-        JDK_ARCH=x64; \
-    fi && \
-    wget -q https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz && \
-    tar -xzf OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz -C /opt && \
-    rm OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz
+  if [ "$ARCH" = "arm64" ]; then \
+  JDK_ARCH=aarch64; \
+  else \
+  JDK_ARCH=x64; \
+  fi && \
+  wget -q https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz && \
+  tar -xzf OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz -C /opt && \
+  rm OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz
 ENV JAVA_HOME=/opt/jdk-21.0.10+7
 ENV PATH=$JAVA_HOME/bin:$PATH
 
 # Install uv and configure Chinese mirror
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    mv /root/.local/bin/uv /usr/local/bin/uv && \
-    mv /root/.local/bin/uvx /usr/local/bin/uvx || true
-ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+  mv /root/.local/bin/uv /usr/local/bin/uv && \
+  mv /root/.local/bin/uvx /usr/local/bin/uvx || true
 
 # Ensure default node user has access to /usr/local/share
 RUN mkdir -p /usr/local/share/npm-global && \
@@ -102,3 +95,8 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 # Install OpenCode
 ARG OPEN_CODE_VERSION=latest
 RUN npm install -g opencode-ai@${OPEN_CODE_VERSION}
+
+# Setup for China mainland
+ENV TZ="Asia/Shanghai"
+ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+RUN npm config set registry https://registry.npmmirror.com
