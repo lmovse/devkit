@@ -58,6 +58,7 @@ RUN mkdir -p /workspace /home/node/.claude /home/node/.config /home/node/.local 
   chown -R node:node /workspace /home/node/.claude /home/node/.config /home/node/.local
 
 COPY ./claude/settings.json /home/node/.claude/settings.json
+COPY ./claude/.claude.json /home/node/.claude.json
 
 WORKDIR /workspace
 
