@@ -57,6 +57,8 @@ ENV DEVCONTAINER=true
 RUN mkdir -p /workspace /home/node/.claude /home/node/.config /home/node/.local && \
   chown -R node:node /workspace /home/node/.claude /home/node/.config /home/node/.local
 
+COPY ./claude/settings.json /home/node/.claude/settings.json
+
 WORKDIR /workspace
 
 ARG GIT_DELTA_VERSION=0.18.2
@@ -84,6 +86,8 @@ ARG ZSH_IN_DOCKER_VERSION=1.2.0
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
   -p git \
   -p fzf \
+  -p zsh-syntax-highlighting \
+  -p zsh-autosuggestions \
   -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
   -a "source /usr/share/doc/fzf/examples/completion.zsh" \
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
