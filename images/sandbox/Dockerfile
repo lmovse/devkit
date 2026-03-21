@@ -60,6 +60,8 @@ RUN mkdir -p /workspace /home/node/.claude /home/node/.config /home/node/.local 
 COPY ./claude/settings.json /home/node/.claude/settings.json
 COPY ./claude/.claude.json /home/node/.claude.json
 
+RUN chown -R node:node /home/node/.claude/settings.json /home/node/.claude.json
+
 WORKDIR /workspace
 
 ARG GIT_DELTA_VERSION=0.18.2
