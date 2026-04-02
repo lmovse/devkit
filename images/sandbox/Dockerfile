@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   zsh \
   man-db \
   unzip \
+  zip \
   gnupg2 \
   gh \
   jq \
@@ -96,6 +97,23 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "source /usr/share/doc/fzf/examples/completion.zsh" \
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
   -x
+
+# Install SDKMAN for SDK version management
+RUN curl -s "https://get.sdkman.io" | bash && \
+  rm -rf /home/node/.sdkman/tmp/* /home/node/.sdkman/archives/* /home/node/.sdkman/cache/*
+
+# Install nvm for Node version management
+ENV NVM_DIR=/home/node/.nvm
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash && \
+  rm -rf $NVM_DIR/.cache $NVM_DIR/.nvexternalsrc 2>/dev/null || true
+
+# Source SDKMAN and nvm in shell
+RUN echo "source /home/node/.sdkman/bin/sdkman-init.sh" >> /home/node/.bashrc && \
+  echo "source /home/node/.sdkman/bin/sdkman-init.sh" >> /home/node/.zshrc && \
+  echo "export NVM_DIR=/home/node/.nvm" >> /home/node/.bashrc && \
+  echo "[ -s \"$NVM_DIR/nvm.sh\" ] && \. \"$NVM_DIR/nvm.sh\"" >> /home/node/.bashrc && \
+  echo "export NVM_DIR=/home/node/.nvm" >> /home/node/.zshrc && \
+  echo "[ -s \"$NVM_DIR/nvm.sh\" ] && \. \"$NVM_DIR/nvm.sh\"" >> /home/node/.zshrc
 
 # Install Claude
 ARG CLAUDE_CODE_VERSION=latest
