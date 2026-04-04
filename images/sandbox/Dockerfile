@@ -20,21 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   tmux \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install OpenJDK 21 from Adoptium
-ARG JDK_VERSION=21.0.10
-RUN ARCH=$(dpkg --print-architecture) && \
-  if [ "$ARCH" = "arm64" ]; then \
-  JDK_ARCH=aarch64; \
-  else \
-  JDK_ARCH=x64; \
-  fi && \
-  wget -q https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz && \
-  tar -xzf OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz -C /opt && \
-  rm OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.10_7.tar.gz
-ENV JAVA_HOME=/opt/jdk-21.0.10+7
-ENV PATH=$JAVA_HOME/bin:$PATH
-
-# Install uv and configure Chinese mirror
+# Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
   mv /root/.local/bin/uv /usr/local/bin/uv && \
   mv /root/.local/bin/uvx /usr/local/bin/uvx || true
@@ -74,6 +60,15 @@ RUN ARCH=$(dpkg --print-architecture) && \
 # Set up non-root user
 USER node
 
+# Set up git with delta as the pager and zdiff3 for merge conflicts
+RUN git config --global core.pager delta && \
+  git config --global interactive.diffFilter 'delta --color-only' && \
+  git config --global delta.navigate true && \
+  git config --global delta.side-by-side true && \
+  git config --global delta.line-numbers true && \
+  git config --global delta.dark true && \
+  git config --global merge.conflictStyle zdiff3
+
 # Install global packages
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
@@ -99,8 +94,11 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -x
 
 # Install SDKMAN for SDK version management
-RUN curl -s "https://get.sdkman.io" | bash && \
-  rm -rf /home/node/.sdkman/tmp/* /home/node/.sdkman/archives/* /home/node/.sdkman/cache/*
+RUN curl -s "https://get.sdkman.io?ci=true" -o /tmp/sdkman-install.sh && \
+  sed -i '/^find "$sdkman_src_folder"/d' /tmp/sdkman-install.sh && \
+  sed -i '/^find "$sdkman_libexec_folder"/d' /tmp/sdkman-install.sh && \
+  bash /tmp/sdkman-install.sh && \
+  rm /tmp/sdkman-install.sh
 
 # Install nvm for Node version management
 ENV NVM_DIR=/home/node/.nvm
@@ -114,6 +112,12 @@ RUN echo "source /home/node/.sdkman/bin/sdkman-init.sh" >> /home/node/.bashrc &&
   echo "[ -s \"$NVM_DIR/nvm.sh\" ] && \. \"$NVM_DIR/nvm.sh\"" >> /home/node/.bashrc && \
   echo "export NVM_DIR=/home/node/.nvm" >> /home/node/.zshrc && \
   echo "[ -s \"$NVM_DIR/nvm.sh\" ] && \. \"$NVM_DIR/nvm.sh\"" >> /home/node/.zshrc
+
+# Install Java, Maven, and Gradle
+RUN bash -c "source /home/node/.sdkman/bin/sdkman-init.sh && \
+  sdk install java 21.0.10-tem && \
+  sdk install maven && \
+  sdk install gradle"
 
 # Install Claude
 ARG CLAUDE_CODE_VERSION=latest
