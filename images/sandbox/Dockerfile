@@ -41,8 +41,8 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 ENV DEVCONTAINER=true
 
 # Create workspace and config directories and set permissions
-RUN mkdir -p /workspace /home/node/.claude /home/node/.config /home/node/.local && \
-  chown -R node:node /workspace /home/node/.claude /home/node/.config /home/node/.local
+RUN mkdir -p /workspace /home/node/.claude /home/node/.config /home/node/.local /home/node/.m2 /home/node/.gradle && \
+  chown -R node:node /workspace /home/node/.claude /home/node/.config /home/node/.local /home/node/.m2 /home/node/.gradle
 
 COPY ./claude/settings.json /home/node/.claude/settings.json
 COPY ./claude/.claude.json /home/node/.claude.json
