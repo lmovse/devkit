@@ -44,17 +44,15 @@ ENV DEVCONTAINER=true
 RUN mkdir -p /workspace /home/node/.claude /home/node/.config /home/node/.local /home/node/.m2 /home/node/.gradle && \
   chown -R node:node /workspace /home/node/.claude /home/node/.config /home/node/.local /home/node/.m2 /home/node/.gradle
 
-COPY ./claude/settings.json /home/node/.claude/settings.json
-COPY ./claude/.claude.json /home/node/.claude.json
-
-RUN chown -R node:node /home/node/.claude/settings.json /home/node/.claude.json
+COPY --chown=node:node ./claude/settings.json /home/node/.claude/settings.json
+COPY --chown=node:node ./claude/.claude.json /home/node/.claude.json
 
 WORKDIR /workspace
 
 ARG GIT_DELTA_VERSION=0.18.2
 RUN ARCH=$(dpkg --print-architecture) && \
   wget "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
-  sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
+  dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
 
 # Set up non-root user
