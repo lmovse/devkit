@@ -121,6 +121,13 @@ RUN bash -c "source /home/node/.sdkman/bin/sdkman-init.sh && \
 ARG CLAUDE_CODE_VERSION=latest
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
+# Install superpowers plugin for Claude
+ENV CLAUDE_CODE_PLUGIN_SEED_DIR=/home/node/.claude-seed
+RUN CLAUDE_CODE_PLUGIN_CACHE_DIR=$CLAUDE_CODE_PLUGIN_SEED_DIR \
+      claude plugin marketplace add obra/superpowers-marketplace && \
+    CLAUDE_CODE_PLUGIN_CACHE_DIR=$CLAUDE_CODE_PLUGIN_SEED_DIR \
+      claude plugin install superpowers@superpowers-marketplace
+
 # Install OpenCode
 ARG OPEN_CODE_VERSION=latest
 RUN npm install -g opencode-ai@${OPEN_CODE_VERSION}
